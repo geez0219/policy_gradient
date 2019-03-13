@@ -45,6 +45,7 @@ def computer_play(save_or_not):
             if keyboard.is_pressed('esc'):
                 esc = 1
 
+
 def play_frame(save_or_not):
     while True:
         obs = env.reset()
@@ -61,12 +62,6 @@ def play_frame(save_or_not):
                 return
             obs_, reward, done, _ = env.step(action)
             print('action:{}, reward:{}, done:{}'.format(action, reward, done))
-            # cv2.imshow('0', obs_[:, :, 0])
-            # cv2.imshow('1', obs_[:, :, 1])
-            # cv2.imshow('2', obs_[:, :, 2])
-            # cv2.imshow('3', obs_[:, :, 3])
-            # cv2.waitKey(30)
-
 
             env.render()
             if save_or_not:
@@ -74,6 +69,7 @@ def play_frame(save_or_not):
                 a_list.append(action)
                 r_list.append(reward)
             time.sleep(0.1)
+
 
 def play_realtime(save_or_not):
     while True:

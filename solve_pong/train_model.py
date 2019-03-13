@@ -1,100 +1,83 @@
 """
-Try to solve_breakout:
-1. using copy model
-2. reduce the action space to 3
-3. Adam optimizer
-"""
+This code is to train the AI model to play pong game
+1. It will generate the trained model (including its check point file and tensorboard log)
 
+"""
 import numpy as np
 import gym
+import argparse
 from solve_pong.PG import PG
 from replaybuffer import ReplayBuffer
 from frame_processor import FrameProcessor
-import cv2
-
-def getRewardTrace(reward, size, decay):
-    '''
-    return the list of [...., reward*decay*decay*2, reward*decay, reward]
-    :param reward: <flaot>
-    :param size: <int>
-    :param decay: <float>
-    :return:
-    '''
-    output = np.ones(size)
-    output[size-1] = reward
-
-    for i in range(size-2, -1, -1):
-        output[i] = output[i+1]*decay
-
-    return output
-
-game_play = 500000
-record_period = 10
-train_batch_n = 20
-train_batch_size = 200
 
 if __name__ == '__main__':
     # declare all agent and environment
+    parser = argparse.ArgumentParser()
+    parser.add_argument("run_name", help="the name of the training model", type=str)
+    parser.add_argument("-l", "--learning_rate", help='the learning rate of the optimizer', type=float, default=1e-5)
+    parser.add_argument("-n", "--games_num", help='the number of training games', type=int, default=500000)
+    parser.add_argument("-r", "--record_period", help='the record period of tensorboard', type=int, default=100)
+    parser.add_argument("-p", "--save_path", help='the saving path of checkpoint and model tensorboard data', type=str, default='./result/')
+    arg = parser.parse_args()
+
+    print('---------- argument setting -----------')
+    print('run_name: {}'.format(arg.run_name))
+    print('learning_rate: {}'.format(arg.learning_rate))
+    print('games_num: {}'.format(arg.games_num))
+    print('record_period: {}'.format(arg.record_period))
+    print('save_path: {}'.format(arg.save_path))
+    print('---------------------------------------')
     env = gym.make('Pong-v0')
-    agent = PG(run_name='PG_fully_connected',
+    agent = PG(run_name=arg.run_name,
                input_shape=[160,160],
                n_action=3,
-               learning_rate=1e-5,
-               save_path='./result/',
+               learning_rate=arg.learning_rate,
+               save_path=arg.save_path,
                record_io=True,
                record=True,
                gpu_fraction=0.9)
 
-    replay_buffer = ReplayBuffer(input_shape=[160,160], size=100000)
-
-    for i in range(game_play):
-        s_list = np.empty((0, 160, 160))
-        a_list = np.empty((0))
+    for i in range(arg.games_num):
+        replay_buffer = ReplayBuffer(input_shape=[160, 160], start_size=32, max_size=10000000)
+        memory = []
         total_reward = 0
 
         obs = env.reset()
         frame_processor = FrameProcessor(obs)
         obs, reward, done, _ = env.step(agent.random_action() + 1)  # do random action at the first frame
-
+        total_reward += reward
         # play one game
         while not done:
             input_frame = frame_processor.process(obs)
-            # cv2.imshow('test', frame_processor.OneTo255(input_frame))
-            # cv2.waitKey(30)
-            # env.render()
             prob = agent.get_action_prob(input_frame)
-            # print(prob)
+            print(prob)
             action = np.random.choice(3, p=prob)
             obs, reward, done, _ = env.step(action + 1)
 
             if reward == 0:
-                s_list = np.concatenate((s_list, input_frame.reshape((1,160,160))), axis=0)
-                a_list = np.concatenate((a_list, np.array([reward])), axis=0)
+                replay_buffer.store_transition(input_frame, action)
 
             else:
                 total_reward += reward
                 if reward == 1:
-                    reward_trace = getRewardTrace(reward, len(s_list), 1)
+                    replay_buffer.back_trace_reward(reward, 1)
                 else:
-                    reward_trace = getRewardTrace(reward, len(s_list), 0.9)
+                    replay_buffer.back_trace_reward(reward, 0.9)
 
-                replay_buffer.store_transition_batch(obs=s_list, action=a_list, reward=reward_trace)
-                s_list = np.empty((0, 160, 160))
-                a_list = np.empty((0))
+                memory.append(replay_buffer)
+                replay_buffer = ReplayBuffer(input_shape=[160, 160], start_size=32, max_size=10000000)
 
         # train in the memory
         step = agent.step_move()
         loss = 0
-        for j in range(train_batch_n):
-            s, a, r = replay_buffer.sample(batch_size=train_batch_size)
-            loss += agent.train(s, a, r, record=True if (step % record_period == 0 and j == 0) else False)
+        for j in range(len(memory)):
+            s, a, r = memory[j].get_SAR()
+            loss += agent.train(s, a, r, record=True if (step % arg.record_period == 0 and j == 0) else False)
 
-        loss /= train_batch_n # get tge average loss
-        replay_buffer.clear()
-
+        loss /= len(memory) # get tge average loss
         print('{}th step: the total reward is {}, the average loss is {}'.format(step, total_reward, loss))
 
         # save the file and reward
-        if step % record_period == 0:
+        if step % arg.record_period == 0:
             agent.save()
             agent.log_reward(total_reward)

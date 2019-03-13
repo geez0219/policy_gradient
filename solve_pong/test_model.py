@@ -1,11 +1,12 @@
 import numpy as np
 import gym
 import time
+import argparse
+import os
 from solve_pong.PG import PG
 from frame_processor import FrameProcessor
 
-
-def play_game(agent, env, mode, render):
+def play_game(agent, env, game_play, mode, render):
     action_list = ['stay', 'go up', 'go down']
     reward_avg = 0
     for i in range(game_play):
@@ -40,21 +41,37 @@ def play_game(agent, env, mode, render):
 
 
 if __name__ == '__main__':
-    # declare all agent and environment
-    env = gym.make('Pong-v0')
-    game_play = 500000
-    run_name = 'PG_fully_connected_new_replay_buffer'
-    agent = PG(run_name=run_name,
-               input_shape=[160,160],
-               n_action=3,
-               learning_rate=1e-5,
-               save_path='./result/',
-               record_io=True,
-               record=True,
-               gpu_fraction=0.9)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("run_name", help="the name of the training model", type=str)
+    parser.add_argument("-n", "--games_num", help='the number of training games', type=int, default=100)
+    parser.add_argument("-p", "--load_path", help='the load path of checkpoint', type=str, default='./result/')
+    parser.add_argument("-s", "--show", help='whether to show the gameplay screen', action='store_true')
+    parser.add_argument("-c", "--choose_highest", help="whether the each action choose the highest probability one", action="store_true")
+    arg = parser.parse_args()
 
-    print("please select the action selection mode you want")
-    mode = int(input("0: normal, 1: choose highest prob:"))
-    print("please select the whether to render the playing process")
-    render = int(input("0: no, 1: yes:"))
-    play_game(agent, env, mode, render)
+    print('---------- argument setting -----------')
+    print('run_name: {}'.format(arg.run_name))
+    print('games_num: {}'.format(arg.games_num))
+    print('load_path: {}'.format(arg.load_path))
+    print('show: {}'.format(arg.show))
+    print('choose_highest: {}'.format(arg.show))
+    print('---------------------------------------')
+
+    # declare all agent and environment
+
+    env = gym.make('Pong-v0')
+
+    if not os.path.exists('{}{}'.format(arg.load_path, arg.run_name)):
+        raise ValueError('{}{} did not exist! '.format(arg.load_path, arg.run_name))
+
+    agent = PG(run_name=arg.run_name,
+               input_shape=[160, 160],
+               n_action=3,
+               learning_rate=0,
+               save_path=arg.load_path,
+               record_io=False,
+               record=False,
+               gpu_fraction=0.9)
+    agent.load(arg.load_path, arg.run_name)
+    play_game(agent, env, arg.games_num, arg.choose_highest, arg.show)
+

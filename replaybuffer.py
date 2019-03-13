@@ -2,93 +2,59 @@ import numpy as np
 
 
 class ReplayBuffer:
-    def __init__(self, size, input_shape):
-        self.size = size
-        self.input_shape = input_shape
-        self.s = np.zeros([self.size, ] + self.input_shape)
-        self.a = np.zeros([self.size])
-        self.r = np.zeros([self.size])
+    def __init__(self, input_shape, start_size, max_size):
+        self.s = np.zeros([start_size] + input_shape)
+        self.a = np.zeros([start_size])
+        self.r = np.zeros(0)
         self.counter = 0
+        self.current_size = start_size
+        self.max_size = max_size
+        self.input_shape = input_shape
 
-    def store_transition(self, obs, action, reward):
-        memory_idx = self.counter % self.size
-        self.s[memory_idx] = obs
-        self.a[memory_idx] = action
-        self.r[memory_idx] = reward
+    def double_size(self):
+        new_size = min(self.current_size * 2, self.max_size)
+
+        new_s = np.zeros([new_size] + self.input_shape)
+        new_a = np.zeros([new_size])
+        new_s[:self.current_size] = self.s
+        new_a[:self.current_size] = self.a
+        self.s = new_s
+        self.a = new_a
+        self.current_size = new_size
+
+    def store_transition(self, s, a):
+        if self.counter == self.current_size:
+            if self.current_size == self.max_size:
+                print('the ReplayBuffer size reach its max_size, cannot store more transition')
+                return
+            else:
+                self.double_size()
+        self.s[self.counter] = s
+        self.a[self.counter] = a
         self.counter += 1
 
-    def store_transition_batch(self, obs, action, reward):
-        if type(obs) is not np.ndarray:
-            raise TypeError('the input argument obs should be ndarray')
+    def back_trace_reward(self, reward, decay):
+        if self.counter != 0:
+            self.r = np.zeros([self.counter])
+            self.r[-1] = reward
 
-        if type(action) is not np.ndarray:
-            raise TypeError('the input argument action should be ndarray')
+            for i in range(self.counter-2, -1, -1):
+                self.r[i] = self.r[i+1] * decay
 
-        if type(reward) is not np.ndarray:
-            raise TypeError('the input argument reward should be ndarray')
+    def get_SAR(self):
+        return self.s[:self.counter], self.a[:self.counter], self.r[:self.counter]
 
-        batch_size = obs.shape[0]
-        memory_idx_start = self.counter % self.size
-
-        if memory_idx_start + batch_size > self.size:  # the memory_idx will return back during saving the batch
-            if batch_size < self.size:    # need to split the input into two batches
-                batch1_size = self.size - memory_idx_start
-                batch2_size = batch_size - batch1_size
-
-                self.s[memory_idx_start:self.size] = obs[:batch1_size]
-                self.s[:batch2_size] = obs[batch1_size:]
-
-                self.a[memory_idx_start:self.size] = action[:batch1_size]
-                self.a[:batch2_size] = action[batch1_size:]
-
-                self.r[memory_idx_start:self.size] = reward[:batch1_size]
-                self.r[:batch2_size] = reward[batch1_size:]
-
-            else:  # batch size is larger than memory size
-                self.s[:] = obs[batch_size-self.size:batch_size]
-                self.a[:] = action[batch_size-self.size:batch_size]
-                self.r[:] = reward[batch_size-self.size:batch_size]
-
-        else:
-            self.s[memory_idx_start:memory_idx_start + batch_size] = obs
-            self.a[memory_idx_start:memory_idx_start + batch_size] = action
-            self.r[memory_idx_start:memory_idx_start + batch_size] = reward
-
-        self.counter += batch_size
-
-    def sample(self, batch_size):
-        rand_idx = np.random.choice(min(self.counter, self.size), batch_size)
-
-        return [self.s[rand_idx].copy(),
-                self.a[rand_idx].copy(),
-                self.r[rand_idx].copy()]
-
-    def clear(self):
-        self.s = np.zeros([self.size, ] + self.input_shape)
-        self.a = np.zeros([self.size])
-        self.r = np.zeros([self.size])
-        self.counter = 0
-
-    def get_current_size(self):
-        return min(self.size, self.counter)
 
 
 if __name__ == '__main__':
-    print('testing replaybuffer')
-    memory = ReplayBuffer(50, [1])
-    batch1_obs = np.array([[i] for i in range(75)])
-    batch1_action = np.array([i for i in range(75)])
-    batch1_reward = np.array([i for i in range(75)])
-    memory.store_transition_batch(batch1_obs, batch1_action, batch1_reward)
-    print(memory.s)
-    print(memory.a)
-    batch1_obs = np.array([[i] for i in range(10)])
-    batch1_action = np.array([i for i in range(10)])
-    batch1_reward = np.array([i for i in range(10)])
-    memory.store_transition_batch(batch1_obs, batch1_action, batch1_reward)
-    print(memory.s)
-    print(memory.a)
 
-    s, a, r = memory.sample(20)
-    print(s)
+    replay_buffer = ReplayBuffer([10], 1, 100)
+    for i in range(100):
+        replay_buffer.store_transition(np.array([i]*10), i)
+        replay_buffer.back_trace_reward(1,0.5)
+
+
+
+
+
 
