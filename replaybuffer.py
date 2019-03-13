@@ -72,6 +72,7 @@ class ReplayBuffer:
     def get_current_size(self):
         return min(self.size, self.counter)
 
+
 if __name__ == '__main__':
     print('testing replaybuffer')
     memory = ReplayBuffer(50, [1])
