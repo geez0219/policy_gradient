@@ -3,12 +3,46 @@ This code is to train the AI model to play pong game
 1. It will generate the trained model (including its check point file and tensorboard log)
 
 """
+import os
+import shutil
 import numpy as np
 import gym
 import argparse
 from solve_pong.PG import PG
 from replaybuffer import ReplayBuffer
 from frame_processor import FrameProcessor
+
+
+def check_run_file(arg):
+    if os.path.exists("{}{}".format(arg.save_path, arg.run_name)):
+        print("the run directory [{}{}] already exists!".format(arg.save_path, arg.run_name))
+        print("0: exist ")
+        print("1: restored the session from checkPoint ")
+        print("2: start over and overwrite")
+        print("3: create a new run")
+        mode = int(input("please select the mode:"))
+
+        if mode == 0:
+            exit("you select to exist")
+
+        elif mode == 2:
+            shutil.rmtree("{}{}".format(arg.save_path, arg.run_name))
+            os.makedirs("{}{}".format(arg.save_path, arg.run_name))
+            shutil.copyfile(__file__, "{}{}/copy_code.py".format(arg.save_path, arg.run_name))
+
+        elif mode == 3:
+            arg.run_name = input("please enter a new run name:")
+            return check_run_file(arg)
+
+        elif mode > 3 or mode < 0:
+            raise ValueError("the valid actions are in range [0-3]")
+    else:
+        print("create run directory [{}{}]".format(arg.save_path, arg.run_name))
+        mode = 2
+        os.makedirs("{}{}".format(arg.save_path, arg.run_name))
+        shutil.copyfile(__file__, "{}{}/copy_code.py".format(arg.save_path, arg.run_name))
+
+    return mode
 
 if __name__ == '__main__':
     # declare all agent and environment
@@ -28,12 +62,15 @@ if __name__ == '__main__':
     print('save_path: {}'.format(arg.save_path))
     print('---------------------------------------')
     env = gym.make('Pong-v0')
+
+    check_run_file(arg)
+
     agent = PG(run_name=arg.run_name,
                input_shape=[160,160],
                n_action=3,
                learning_rate=arg.learning_rate,
                save_path=arg.save_path,
-               record_io=True,
+               record_io=False,
                record=True,
                gpu_fraction=0.9)
 
@@ -50,7 +87,6 @@ if __name__ == '__main__':
         while not done:
             input_frame = frame_processor.process(obs)
             prob = agent.get_action_prob(input_frame)
-            print(prob)
             action = np.random.choice(3, p=prob)
             obs, reward, done, _ = env.step(action + 1)
 

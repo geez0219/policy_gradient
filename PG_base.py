@@ -44,7 +44,7 @@ class PG_Base:
 
     def deal_record_file(self):
         if os.path.exists('{}{}'.format(self.save_path, self.run_name)):
-            print('the run directory already exists!')
+            print('the run directory [{}{}] already exists!'.format(self.save_path, self.run_name))
             print('0: exist ')
             print('1: restored the session from checkPoint ')
             print('2: start over and overwrite')
@@ -58,7 +58,8 @@ class PG_Base:
             elif mode == 2:
                 shutil.rmtree('{}{}'.format(self.save_path, self.run_name))
             elif mode == 3:
-                self.run_name = input('please enter a new run name')
+                self.run_name = input('please enter a new run name:')
+                self.deal_record_file()
             else:
                 raise ValueError('the valid actions are in range [0-3]')
 

@@ -54,7 +54,7 @@ if __name__ == '__main__':
     print('games_num: {}'.format(arg.games_num))
     print('load_path: {}'.format(arg.load_path))
     print('show: {}'.format(arg.show))
-    print('choose_highest: {}'.format(arg.show))
+    print('choose_highest: {}'.format(arg.choose_highest))
     print('---------------------------------------')
 
     # declare all agent and environment
